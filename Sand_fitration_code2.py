@@ -971,6 +971,96 @@ def write_results_definitions_csv(df: pd.DataFrame,
     df_def = pd.DataFrame(rows, columns=["variable_name", "definition"])
     df_def.to_csv(path, index=False)
 
+def run_single_run(model: CamposSSFModel,
+                   infl: SSFInfluent,
+                   n_steps: int) -> pd.DataFrame:
+    """
+    Run a single filtration run with a fixed influent and collect:
+
+      1) Time-series summary outputs (returned as df_results)
+      2) Full depth–time profiles (written to Campos_SSF_Profiles.csv)
+
+    The main script is responsible only for writing df_results to
+    Campos_SSF_Results.csv and the definitions CSV.
+    """
+
+    # -------------------------------
+    # Containers for results
+    # -------------------------------
+    history = []          # time-series summary (one row per time step)
+    profile_history = []  # depth profiles (one row per depth cell per time step)
+
+    # -------------------------------
+    # Time loop
+    # -------------------------------
+    for istep in range(n_steps):
+        t = istep * model.dt  # [h] time since start of run
+
+        # Advance the full Campos model by one time step
+        model.step(
+            T=infl.T,
+            Nv=infl.Nv,
+            D=infl.D,
+            z=infl.z,
+            Cp_inlet=infl.Cp_inlet_inert,  # or infl.Cp_inlet if that's your field
+            n_tot=infl.n_tot,
+        )
+
+        # ---- 1) Summary outputs for this time step (top/bottom, supernatant, biology) ----
+        history.append({
+            "time_h": t,
+            "a_sup": model.a_sup,
+            "ps_sup": model.ps_sup,
+            "na_sup": model.na_sup,
+            "ni_sup": model.ni_sup,
+            "Cp_top": model.Cp[0],
+            "Cp_bottom": model.Cp[-1],
+            "sigma_top": model.sigma[0],
+            "sigma_bottom": model.sigma[-1],
+            "H_ratio_top": model.H_ratio[0],
+            "H_ratio_bottom": model.H_ratio[-1],
+            "x_bed0": model.x_bed[0],
+            "p_bed0": model.p_bed[0],
+            "cd_bed0": model.cd_bed[0],
+            "cp_bed0": model.cp_bed[0],
+            "ps_bed0": model.ps_bed[0],
+        })
+
+        # ---- 2) Full depth profiles for this time step ----
+        for j in range(model.nz):
+            z = model.L[j]          # depth [m]
+            Cp_j = model.Cp[j]      # suspended solids [mg/L]
+            sigma_j = model.sigma[j]  # bulk specific deposit [vol/vol]
+
+            # Constant superficial velocity as used in the current hydraulics
+            u_const = model.const.q
+
+            # Effective pore velocity if porosity loss were enforced (diagnostic only)
+            eps0 = model.par.eps0
+            u_eff = u_const / (eps0 - sigma_j + 1e-30)
+
+            profile_history.append({
+                "time_h": t,
+                "z_m": z,
+                "Cp": Cp_j,
+                "sigma": sigma_j,
+                "u_const": u_const,
+                "u_eff": u_eff,
+            })
+
+    # -------------------------------
+    # Build DataFrames
+    # -------------------------------
+    df_results = pd.DataFrame(history)
+
+    df_profiles = pd.DataFrame(profile_history)
+    df_profiles.to_csv("Campos_SSF_Profiles.csv", index=False)
+    print("Depth–time profiles written to Campos_SSF_Profiles.csv")
+    print("df_profiles shape:", df_profiles.shape)
+
+    return df_results
+
+
 
 
 # =============================================================================
