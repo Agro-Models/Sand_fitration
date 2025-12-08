@@ -875,6 +875,103 @@ def sse(observed: np.ndarray, simulated: np.ndarray) -> float:
     simulated = np.asarray(simulated)
     return float(np.sum((simulated - observed) ** 2))
 
+def write_results_definitions_csv(df: pd.DataFrame,
+                                  path: str = "Campos_SSF_Results_DEFINITIONS.csv") -> None:
+    """
+    Write a separate CSV containing human-readable definitions of each
+    column in the simulation results DataFrame.
+
+    This keeps Campos_SSF_Results.csv purely numeric (for plotting and
+    analysis), while Campos_SSF_Results_DEFINITIONS.csv documents what
+    each variable means.
+
+    The mapping below is based on the current history fields written in
+    the main loop:
+        time_h, a_sup, ps_sup, na_sup, ni_sup,
+        Cp_top, Cp_bottom,
+        sigma_top, sigma_bottom,
+        H_ratio_top, H_ratio_bottom,
+        x_bed0, p_bed0, cd_bed0, cp_bed0, ps_bed0
+    """
+    # Definitions for known columns. Any future column not listed here
+    # will still be included with a placeholder definition.
+    definitions = {
+        "time_h": (
+            "Time since start of filtration run [hours]."
+        ),
+        "a_sup": (
+            "Supernatant algae concentration as chlorophyll-a [mg Chla/L] "
+            "(Eqs. 1–2)."
+        ),
+        "ps_sup": (
+            "Supernatant soluble phosphorus concentration [mg P/L] "
+            "(Eq. 6)."
+        ),
+        "na_sup": (
+            "Supernatant ammonium nitrogen (NH4-N) concentration [mg N/L] "
+            "(Eq. 7)."
+        ),
+        "ni_sup": (
+            "Supernatant nitrate nitrogen (NO3-N) concentration [mg N/L] "
+            "(Eq. 8)."
+        ),
+        "Cp_top": (
+            "Suspended solids concentration in pore water at top of sand bed "
+            "[mg/L] (after filtration along depth, Eq. 16)."
+        ),
+        "Cp_bottom": (
+            "Suspended solids concentration in pore water at bottom of sand "
+            "bed [mg/L] (Eq. 16)."
+        ),
+        "sigma_top": (
+            "Bulk specific deposit σ at top layer [dimensionless vol/vol], "
+            "σ = b·σ_a (Eq. 19)."
+        ),
+        "sigma_bottom": (
+            "Bulk specific deposit σ at bottom layer [dimensionless vol/vol], "
+            "σ = b·σ_a (Eq. 19)."
+        ),
+        "H_ratio_top": (
+            "Relative headloss H(L,t)/H(L,0) at top layer [-], computed from "
+            "deposit via Eq. 22."
+        ),
+        "H_ratio_bottom": (
+            "Relative headloss H(L,t)/H(L,0) at bottom layer [-], computed "
+            "from deposit via Eq. 22."
+        ),
+        "x_bed0": (
+            "Bacterial biomass concentration in first bed layer (near surface) "
+            "[mg C/L] (Eqs. 24–25)."
+        ),
+        "p_bed0": (
+            "Protozoa biomass concentration in first bed layer [mg C/L] "
+            "(Eq. 26)."
+        ),
+        "cd_bed0": (
+            "Dissolved organic carbon (DOC) concentration in first bed layer "
+            "[mg C/L] (Eq. 28)."
+        ),
+        "cp_bed0": (
+            "Nonliving particulate organic carbon (POC) in first bed layer "
+            "[mg C/L] (Eq. 27)."
+        ),
+        "ps_bed0": (
+            "Phosphorus concentration in first bed layer [mg P/L] (Eq. 29)."
+        ),
+    }
+
+    rows = []
+    for col in df.columns:
+        desc = definitions.get(
+            col,
+            "NO DEFINITION AVAILABLE – please document this variable."
+        )
+        rows.append({"variable_name": col, "definition": desc})
+
+    df_def = pd.DataFrame(rows, columns=["variable_name", "definition"])
+    df_def.to_csv(path, index=False)
+
+
 
 # =============================================================================
 # DEMO DRIVER: RUN MODEL, COLLECT HISTORY, EXPORT CSV, EXPOSE df_results
@@ -903,7 +1000,15 @@ if __name__ == "__main__":
     df_results = run_single_run(model, infl, cfg.n_steps)
 
     # --- Export CSV ---
+    # --- Export CSV ---
     df_results.to_csv("Campos_SSF_Results.csv", index=False)
-
     print("\nTime series written to Campos_SSF_Results.csv")
     print("df_results shape:", df_results.shape)
+
+    # --- Export definitions file ---
+    write_results_definitions_csv(
+        df_results,
+        path="Campos_SSF_Results_DEFINITIONS.csv"
+    )
+    print("Variable definitions written to Campos_SSF_Results_DEFINITIONS.csv")
+   
